@@ -1,0 +1,10 @@
+.DS_Store
+*.ipynb
+__pycache__
+.ipynb_checkpoints/
+*.ich
+backup_for_*
+
+# sweep simulation files
+**/weight_bank_*
+ndoped_heater_p0.log
