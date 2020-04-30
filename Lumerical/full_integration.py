@@ -12,16 +12,14 @@ lumapi = imp.load_source("lumapi.py", "/Applications/Lumerical 2020a.app/Content
 def wgT_name(min_v, max_v, interval_v):
     return "cache/wgT_" + str(min_v) + "_" + str(max_v) + "_" + str(interval_v) + "_.mat"
 
-def passivebentwg_name(laser_wavelength):
-    return "cache/passivebentwg_" + str(laser_wavelength) + "_.ldf"
+def passivebentwg_name(start_wavelength, end_wavelength):
+    return "cache/passivebentwg_" + str(start_wavelength) + "_" + str(end_wavelength) + "_.ldf"
 
-def activebentwg_name(laser_wavelength, min_v, max_v, interval_v):
-    return "cache/activebentwg_" + str(laser_wavelength) + "_" + str(min_v) + "_" + str(max_v) + "_" + str(interval_v) + "_.ldf"
+def activebentwg_name(start_wavelength, end_wavelength, min_v, max_v, interval_v):
+    return "cache/activebentwg_" + str(start_wavelength) + "_" + str(end_wavelength) + "_" + str(min_v) + "_" + str(max_v) + "_" + str(interval_v) + "_.ldf"
 
 def neff_name(laser_wavelength, min_v, max_v, interval_v):
     return "cache/neff_" + str(laser_wavelength) + "_" + str(min_v) + "_" + str(max_v) + "_" + str(interval_v) + "_.txt"
-
-# TODO add straight waveguide
 
 def heat(min_v, max_v, interval_v):
     device = lumapi.DEVICE("ndoped_heater.ldev")
@@ -44,20 +42,20 @@ def heat(min_v, max_v, interval_v):
     resistance = reg[0]
     print("Resistance = " + str(resistance) + " Ohms")
 
+    '''
     plt.plot(current, voltage)
     plt.xlabel("current")
     plt.ylabel("voltage")
     plt.show()
+    '''
 
     device.close()
     return current, voltage
 
 
-# TODO: cache once for 1500-1600 (and any others similar) dont resim this one
-# maybe just do a warning or something
-
+# NOTE: straight waveguides arent included here
 # NOTE: this does not usually need to be re-simulated
-def passiveBentWg(laser_wavelength):
+def passiveBentWg(start_wavelength, end_wavelength):
     mode = lumapi.MODE("rib_waveguide.lms")
 
     mode.switchtolayout()
@@ -66,22 +64,25 @@ def passiveBentWg(laser_wavelength):
 
     mode.run()
     mode.setanalysis("number of trial modes", 5)
-    mode.setanalysis("wavelength", laser_wavelength)
+    mode.setanalysis("wavelength", start_wavelength)
     mode.setanalysis("use max index", 1)
 
     mode.findmodes()
     mode.selectmode(1)
 
+    mode.setanalysis("stop wavelength", end_wavelength)
     mode.setanalysis("track selected mode", 1);
 
     mode.frequencysweep()
 
     dataname = mode.copydcard("frequencysweep");
-    mode.savedcard(passivebentwg_name(laser_wavelength), dataname);
+    mode.savedcard(passivebentwg_name(start_wavelength, end_wavelength), dataname);
     mode.close()
     return
 
-def neffModeSolver(laser_wavelength, min_v, max_v, interval_v):
+
+#def neffModeSolver(laser_wavelength, min_v, max_v, interval_v):
+def activeBentWg(start_wavelength, end_wavelength, min_v, max_v, interval_v):
     mode = lumapi.MODE("rib_waveguide.lms")
 
     mode.switchtolayout()
@@ -90,17 +91,23 @@ def neffModeSolver(laser_wavelength, min_v, max_v, interval_v):
 
     mode.run()
     mode.setanalysis("number of trial modes", 2)
-    mode.setanalysis("wavelength", laser_wavelength)
+    mode.setanalysis("wavelength", start_wavelength)
     mode.setanalysis("use max index", 1)
 
     mode.findmodes()
-
     mode.selectmode(1)
+
+    mode.setanalysis("stop wavelength", end_wavelength)
     mode.setanalysis("track selected mode", 1)
+
     mode.frequencysweep()
     dataname = mode.copydcard("frequencysweep")
-    mode.savedcard(activebentwg_name(laser_wavelength, min_v, max_v, interval_v), dataname)
+    mode.savedcard(activebentwg_name(start_wavelength, end_wavelength, min_v, max_v, interval_v), dataname)
 
+    # same sim will be used for neff.txt so dont close yet
+    return mode
+
+def effective_index(mode, laser_wavelength, min_v, max_v, interval_v):
     voltage = np.arange(min_v, max_v, step=interval_v) # volts
     neffT = []
 
@@ -146,6 +153,9 @@ def interconnect(laser_wavelength, sim_type):
     return ic
 
 #heat(0,20,0.2)
-#neffModeSolver(1545e-9, 0, 20, 0.2)
 
-passiveBentWg(1500e-9)
+#neffModeSolver(1545e-9, 0, 20, 0.2)
+#mode = activeBentWg(1500e-9, 1600e-9, 0, 20, 0.2)
+#effective_index(mode, 1500e-9, 0, 20, 0.2)
+
+passiveBentWg(1500e-9, 1698e-9)
