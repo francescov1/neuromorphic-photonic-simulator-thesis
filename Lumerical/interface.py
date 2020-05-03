@@ -3,6 +3,7 @@ import numpy as np
 from scipy.stats import linregress
 from scipy.constants import c
 from matplotlib import pyplot as plt
+from math import log
 
 time_window = 5.12e-09
 n_samples = 15360
@@ -126,7 +127,6 @@ def effective_index(inputs, mode = None):
     filename = neff_name(source_wavelength, min_v, max_v, interval_v)
 
     if mode is None:
-        # TODO: test this for active notbeing run but neff still being run (will need to call this itself rather than get mode from activebent sim)
         print("Setting up mode")
         mode = lumapi.MODE("Lumerical/rib_waveguide.lms")
         mode.setanalysis("number of trial modes", 2)
@@ -157,11 +157,106 @@ def effective_index(inputs, mode = None):
 
     return filename
 
-# TODO: figure out what to do with current defaults, maybe just rename them and
-# put in cache although we dont want absolute paths if someone justwants to run sim
+def laser_wavelength_sweep(ic, inputs):
+    print("Running laser wavelength sweep")
+    min_v, max_v, interval_v = [inputs[k] for k in ('min_v', 'max_v', 'interval_v')]
+    sweep_name = "laser_wavelength_sweep"
+
+    # delete any sweeps already saved
+    ic.deletesweep(sweep_name);
+
+    ic.addsweep(0)
+    ic.setsweep("sweep", "name", sweep_name);
+    ic.setsweep(sweep_name, "type", "Ranges");
+    ic.setsweep(sweep_name, "number of points", int((max_v-min_v)/interval_v));
+
+    params = {
+        "Name": "dc_amplitude",
+        "Parameter": "::Root Element::DC_1::amplitude",
+        "Type": "Number",
+        "Start": min_v,
+        "Stop": max_v
+    }
+
+    ic.addsweepparameter(sweep_name, params);
+
+    results = [
+        {
+            "Name": "drop_transmission",
+            "Result": "::Root Element::OOSC_2::mode 1/signal"
+        },
+        {
+            "Name": "thru_transmission",
+            "Result": "::Root Element::OOSC_1::mode 1/signal"
+        }
+    ]
+
+    for result in results:
+        ic.addsweepresult(sweep_name, result);
+
+    ic.runsweep(sweep_name)
+    print("Done running laser wavelength sweep")
+    return
+
+def ona_sweep(ic, inputs):
+    print("Running ona sweep")
+    min_v, max_v, interval_v = [inputs[k] for k in ('min_v', 'max_v', 'interval_v')]
+    sweep_name = "ona_sweep"
+
+    # delete any sweeps already saved
+    ic.deletesweep(sweep_name);
+
+    ic.addsweep(0)
+    ic.setsweep("sweep", "name", sweep_name);
+    ic.setsweep(sweep_name, "type", "Ranges");
+    ic.setsweep(sweep_name, "number of points", int((max_v-min_v)/interval_v));
+
+    params = {
+        "Name": "dc_amplitude",
+        "Parameter": "::Root Element::DC_1::amplitude",
+        "Type": "Number",
+        "Start": min_v,
+        "Stop": max_v
+    }
+
+    ic.addsweepparameter(sweep_name, params);
+
+    results = [
+        {
+            "Name": "drop_transmission",
+            "Result": "::Root Element::ONA_1::input 2/mode 1/gain"
+        },
+        {
+            "Name": "thru_transmission",
+            "Result": "::Root Element::ONA_1::input 1/mode 1/gain"
+        }
+    ]
+
+    for result in results:
+        ic.addsweepresult(sweep_name, result);
+
+    ic.runsweep(sweep_name)
+    print("Done running ona sweep")
+
+    # helper function to get results
+    def get_result(result_name):
+        result = ic.getsweepresult(sweep_name, result_name)
+        wavelength_param = result['Lumerical_dataset']['parameters'][0][0]
+        signal_param = result['Lumerical_dataset']['attributes'][0]
+        wavelength = result[wavelength_param]
+        wavelength = [x[0] for x in wavelength]
+        signal = result[signal_param]
+        return wavelength, signal
+
+    # NOTE: feel free to do anything with these results
+    drop_wavelength, drop_transmission = get_result("drop_transmission")
+    thru_wavelength, thru_transmission = get_result("thru_transmission")
+    return
+
+
 def interconnect(inputs, files):
     print("Running interconnect simulation")
-    source_wavelength, sim_type = [inputs[k] for k in ('source_wavelength', 'sim_type')]
+    source_wavelength, sim_type, heater_sim_type = [inputs[k] for k in ('source_wavelength', 'sim_type', 'heater_sim_type')]
 
     ic = lumapi.INTERCONNECT(files['interconnect'])
 
@@ -184,20 +279,16 @@ def interconnect(inputs, files):
         ic.delete()
         ic.connect("CWL_1", "output", "COMPOUND_1", "input")
 
-        # TODO: if user is doing voltage sweep, run laser_sweep
+        if heater_sim_type == "sweep":
+            laser_wavelength_sweep(ic, inputs)
+        else:
+            ic.run()
+
     else:
-        print("scatter")
+        if heater_sim_type == "sweep":
+            ona_sweep(ic, inputs)
+        else:
+            ic.run()
 
-        # TODO: if user is doing voltage sweep, run ona_sweep
-
-    ic.run()
     input("Simulation complete. Please export any data you would like to keep from Lumerical and press ENTER once finished.")
     return ic
-
-#heat(0,20,0.2)
-
-#neffModeSolver(1545e-9, 0, 20, 0.2)
-#mode = activebentwg(1500e-9, 1600e-9, 0, 20, 0.2)
-#effective_index(mode, 1500e-9, 0, 20, 0.2)
-
-#passivebentwg(1500e-9, 1698e-9)
