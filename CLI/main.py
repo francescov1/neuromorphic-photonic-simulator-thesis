@@ -69,9 +69,6 @@ class CLI:
         ]
 
         params = prompt(questions)
-        params['min_v'] = float(params['min_v'])
-        params['max_v'] = float(params['max_v'])
-        params['interval_v'] = float(params['interval_v'])
         params['source_wavelength'] = float(params['source_wavelength'])
 
         # this is to standardize parameter names
@@ -84,6 +81,16 @@ class CLI:
             half_window = params['wavelength_window'] / 2
             params['start_wavelength'] = params['source_wavelength'] - half_window
             params['end_wavelength'] = params['source_wavelength'] + half_window
+
+        if params['heater_sim_type'] == "constant voltage":
+            params['constant_v'] = float(params['constant_v'])
+            params['min_v'] = params['constant_v']
+            params['max_v'] = params['constant_v']
+            params['interval_v'] = 1
+        else:
+            params['min_v'] = float(params['min_v'])
+            params['max_v'] = float(params['max_v'])
+            params['interval_v'] = float(params['interval_v'])
 
         self.params = params
         return params

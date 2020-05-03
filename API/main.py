@@ -1,5 +1,7 @@
 import os
 from pprint import pprint
+from Lumerical import interface
+#import Lumerical
 
 class API:
 
@@ -8,8 +10,8 @@ class API:
 
     def load_cache(self):
         wgT = []
-        activeBentWg = []
-        passiveBentWg = []
+        activebentwg = []
+        passivebentwg = []
         neff = []
 
         for root, subdirs, files in os.walk("./Lumerical/cache"):
@@ -36,7 +38,7 @@ class API:
 
                 elif filename.startswith("activebentwg_") and filename.endswith(".ldf"):
                     _, start_wavelength, end_wavelength, min_v, max_v, interval_v, _ = filename.split("_")
-                    activeBentWg.append({
+                    activebentwg.append({
                         "start_wavelength": float(start_wavelength),
                         "end_wavelength": float(end_wavelength),
                         "min_v": float(min_v),
@@ -48,21 +50,21 @@ class API:
 
                 elif filename.startswith("passivebentwg_") and filename.endswith(".ldf"):
                     _, start_wavelength, end_wavelength, _ = filename.split("_")
-                    passiveBentWg.append({
+                    passivebentwg.append({
                         "start_wavelength": float(start_wavelength),
                         "end_wavelength": float(end_wavelength),
                         "filename": filename,
                     })
-                    passiveBentWg.append(filename)
+                    passivebentwg.append(filename)
             break
 
         self.wgT = wgT
-        self.activeBentWg = activeBentWg
-        self.passiveBentWg = passiveBentWg
+        self.activebentwg = activebentwg
+        self.passivebentwg = passivebentwg
         self.neff = neff
 
     def get_param_suggestions(self):
-
+        print("Getting param suggestions")
         # fallbacks if no files in cache
         laser_wavelength = 1545e-9
         min_v = 4.5
@@ -89,64 +91,93 @@ class API:
             'constant_v': str(constant_v)
         }
 
-    def run(self, params):
-        print("API run func called. Params:")
-        pprint(params)
-        # TODO: split each component into own function
-        # TODO: look into if wavelength precision changes affect cached sims
-
-        # TODO
-        # heat
+    def get_heat_sim(self):
         cached_to_use = None
         for cached in self.wgT:
-            if (params['max_v'] <= cached['max_v'] and
-                params['min_v'] >= cached['min_v'] and
-                params['interval_v'] >= cached['interval_v']):
+            if (self.inputs['max_v'] <= cached['max_v'] and
+                self.inputs['min_v'] >= cached['min_v'] and
+                self.inputs['interval_v'] >= cached['interval_v']):
                 cached_to_use = cached
                 break
 
-        if not cached_to_use:
-            print("Run heat sim")
-            # run sim
+        if cached_to_use:
+            print("Using cached heat simulation: " + cached_to_use['filename'])
+            return "cache/" + cached_to_use['filename']
+        else:
+            return interface.heat(self.inputs)
 
-
-        # active bend
+    def get_passivebentwg_sim(self):
         cached_to_use = None
-        for cached in self.activeBentWg:
-            if (params['min_v'] >= cached['min_v'] and
-                params['max_v'] <= cached['max_v'] and
-                params['interval_v'] >= cached['interval_v'] and
-                params['start_wavelength'] >= cached['start_wavelength'] and
-                params['end_wavelength'] <= cached['end_wavelength']):
+        for cached in self.passivebentwg:
+            if (self.inputs['start_wavelength'] >= cached['start_wavelength'] and
+                self.inputs['end_wavelength'] <= cached['end_wavelength']):
                 cached_to_use = cached
                 break
 
-        if not cached_to_use:
-            # run sim
-            print("run active sim")
+        if cached_to_use:
+            print("Using cached passivebentwg simulation: " + cached_to_use['filename'])
+            return "cache/" + cached_to_use['filename']
+        else:
+            return interface.passivebentwg(self.inputs)
 
-        # passive bend
+
+    def get_activebentwg_sim(self):
         cached_to_use = None
-        for cached in self.passiveBentWg:
-            if (params['start_wavelength'] >= cached['start_wavelength'] and
-                params['end_wavelength'] <= cached['end_wavelength']):
+        for cached in self.activebentwg:
+            if (self.inputs['min_v'] >= cached['min_v'] and
+                self.inputs['max_v'] <= cached['max_v'] and
+                self.inputs['interval_v'] >= cached['interval_v'] and
+                self.inputs['start_wavelength'] >= cached['start_wavelength'] and
+                self.inputs['end_wavelength'] <= cached['end_wavelength']):
                 cached_to_use = cached
                 break
 
-        if not cached_to_use:
-            # run sim
-            print("run passive sim")
+        if cached_to_use:
+            print("Using cached activebentwg simulation: " + cached_to_use['filename'])
+            return "cache/" + cached_to_use['filename']
+        else:
+            filename, mode = interface.activebentwg(self.inputs)
 
-        # neff
+            # this can then be used for neff calc, rather than reconfiguring a sim
+            self.lum_mode = mode
+            return filename
+
+
+    def get_effective_index_sim(self):
         cached_to_use = None
         for cached in self.neff:
-            if (params['min_v'] >= cached['min_v'] and
-                params['max_v'] <= cached['max_v'] and
-                params['interval_v'] >= cached['interval_v'] and
-                params['source_wavelength'] <= cached['laser_wavelength']):
+            if (self.inputs['min_v'] >= cached['min_v'] and
+                self.inputs['max_v'] <= cached['max_v'] and
+                self.inputs['interval_v'] >= cached['interval_v'] and
+                self.inputs['source_wavelength'] <= cached['laser_wavelength']):
                 cached_to_use = cached
                 break
 
-        if not cached_to_use:
-            # run sim
-            print("run neff sim")
+        lum_mode = self.lum_mode if hasattr(self, 'lum_mode') else None
+        if cached_to_use:
+            print("Using cached effective_index simulation: " + cached_to_use['filename'])
+            # if lum_mode is defined we should close it to minimize resources
+            # (since this sim is cached, so we dont need it)
+            if lum_mode is not None:
+                lum_mode.close()
+            return "cache/" + cached_to_use['filename']
+        else:
+            return interface.effective_index(self.inputs, lum_mode)
+
+    def get_interconnect_sim(self):
+        return "Lumerical/weight_bank.icp"
+
+    def run(self, inputs):
+        print("API inputs:")
+        pprint(inputs)
+        self.inputs = inputs
+
+        files = {
+            'heat': self.get_heat_sim(),
+            'passivebentwg': self.get_passivebentwg_sim(),
+            'activebentwg': self.get_activebentwg_sim(),
+            'effective_index': self.get_effective_index_sim(),
+            'interconnect': self.get_interconnect_sim()
+        }
+
+        interface.interconnect(inputs, files)
