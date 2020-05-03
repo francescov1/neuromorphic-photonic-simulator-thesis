@@ -63,10 +63,27 @@ class CLI:
                 'type': 'input',
                 'name': 'interval_v',
                 'message': 'Voltage precision for N-doped heater (V):',
-                'default': self.defaults['interval_v']
+                'default': self.defaults['interval_v'],
+                'when': lambda answers: answers['heater_sim_type'] == 'sweep'
             }
         ]
 
         params = prompt(questions)
+        params['min_v'] = float(params['min_v'])
+        params['max_v'] = float(params['max_v'])
+        params['interval_v'] = float(params['interval_v'])
+        params['source_wavelength'] = float(params['source_wavelength'])
+
+        # this is to standardize parameter names
+        if (params['sim_type'] == "single laser"):
+            params['start_wavelength'] = params['source_wavelength']
+            params['end_wavelength'] = params['source_wavelength']
+        else:
+            params['wavelength_window'] = float(params['wavelength_window'])
+
+            half_window = params['wavelength_window'] / 2
+            params['start_wavelength'] = params['source_wavelength'] - half_window
+            params['end_wavelength'] = params['source_wavelength'] + half_window
+
         self.params = params
         return params
