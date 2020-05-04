@@ -8,7 +8,11 @@ from math import log
 time_window = 5.12e-09
 n_samples = 15360
 
-lumapi = imp.load_source("lumapi.py", "/Applications/Lumerical 2020a.app/Contents/API/Python/lumapi.py")
+# TODO: set path of the Lumerical installation. See Automation API docs for more information.
+# For MacOS, the following should suffice as long as the version is correct
+lum_version = "2020a"
+lum_path = "/Applications/Lumerical " + lum_version + ".app/Contents/API/Python/lumapi.py"
+lumapi = imp.load_source("lumapi.py", lum_path)
 
 def wgT_name(min_v, max_v, interval_v):
     return "cache/wgT_" + str(min_v) + "_" + str(max_v) + "_" + str(interval_v) + "_.mat"
