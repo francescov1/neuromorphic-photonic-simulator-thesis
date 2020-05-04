@@ -150,7 +150,7 @@ def effective_index(inputs, mode = None):
 
         result_str += str(v) + " " + str(np.real(neff)) + " " + str(np.imag(neff)) + "\n"
 
-    f = open(filename,"w+")
+    f = open("Lumerical/" + filename,"w+")
     f.write(result_str)
     f.close()
     mode.close()
@@ -195,9 +195,11 @@ def laser_wavelength_sweep(ic, inputs):
         ic.addsweepresult(sweep_name, result);
 
     ic.runsweep(sweep_name)
-    print("Done running laser wavelength sweep")
+    print("Done running laser wavelength sweep. Results can be accessed from the laser_wavelength_sweep in Lumerical")
     return
 
+# NOTE: there are sometimes weird race conditions here where the sweep receives
+# no results because automation api is too slow
 def ona_sweep(ic, inputs):
     print("Running ona sweep")
     min_v, max_v, interval_v = [inputs[k] for k in ('min_v', 'max_v', 'interval_v')]
@@ -236,23 +238,8 @@ def ona_sweep(ic, inputs):
         ic.addsweepresult(sweep_name, result);
 
     ic.runsweep(sweep_name)
-    print("Done running ona sweep")
-
-    # helper function to get results
-    def get_result(result_name):
-        result = ic.getsweepresult(sweep_name, result_name)
-        wavelength_param = result['Lumerical_dataset']['parameters'][0][0]
-        signal_param = result['Lumerical_dataset']['attributes'][0]
-        wavelength = result[wavelength_param]
-        wavelength = [x[0] for x in wavelength]
-        signal = result[signal_param]
-        return wavelength, signal
-
-    # NOTE: feel free to do anything with these results
-    drop_wavelength, drop_transmission = get_result("drop_transmission")
-    thru_wavelength, thru_transmission = get_result("thru_transmission")
+    print("Done running ona sweep. Results can be accessed from the ona_sweep in Lumerical")
     return
-
 
 def interconnect(inputs, files):
     print("Running interconnect simulation")
@@ -291,4 +278,5 @@ def interconnect(inputs, files):
             ic.run()
 
     input("Simulation complete. Please export any data you would like to keep from Lumerical and press ENTER once finished.")
-    return ic
+    ic.close()
+    return
