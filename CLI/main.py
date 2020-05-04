@@ -7,16 +7,16 @@ class CLI:
         self.defaults = defaults
 
     def run(self):
+        # NOTE: a bug in PyInquirer ignores the default for lists
+        # a workaround is to place your default as the first element
+        # in the array. See sim_type and heater_sim_type questions
         questions = [
             {
                 'type': 'list',
                 'name': 'sim_type',
                 'message': 'What type of simulation would you like to run?',
-                'choices': [
-                    'scatter',
-                    'single laser'
-                ],
-                'default': 'single laser'
+                'choices': ['scatter', 'single laser'],
+                'default': 'scatter'
             },
             {
                 'type': 'input',
@@ -35,7 +35,7 @@ class CLI:
                 'type': 'list',
                 'name': 'heater_sim_type',
                 'message': 'How do you want to simulate the N-doped heater?',
-                'choices': ['sweep', 'constant voltage'],
+                'choices': ['constant voltage', 'sweep'],
                 'default': 'constant voltage'
             },
             {
