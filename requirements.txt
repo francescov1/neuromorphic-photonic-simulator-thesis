@@ -5,7 +5,7 @@ matplotlib==3.2.1
 numpy==1.18.2
 pprint==0.1
 prompt-toolkit==1.0.14
-Pygments==2.6.1
+Pygments==2.7.4
 PyInquirer==1.0.3
 pyparsing==2.4.7
 python-dateutil==2.8.1
